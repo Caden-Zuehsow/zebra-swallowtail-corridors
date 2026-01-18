@@ -1,0 +1,9 @@
+data/
+outputs/
+*.tif
+*.shp
+*.shx
+*.dbf
+*.prj
+__pycache__/
+.env
