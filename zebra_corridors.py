@@ -10,6 +10,7 @@ Outputs:
 - corridors.shp
 """
 
+import os  # <-- ADD THIS
 import geopandas as gpd
 import rasterio
 import numpy as np
@@ -17,6 +18,11 @@ from rasterio.features import rasterize, shapes
 from scipy.ndimage import distance_transform_edt
 from skimage.graph import route_through_array
 from shapely.geometry import shape
+
+# -------------------------
+# CREATE OUTPUT DIRECTORY
+# -------------------------
+os.makedirs("outputs", exist_ok=True)  # <-- ADD THIS
 
 # -------------------------
 # FILE PATHS
@@ -144,3 +150,4 @@ for geom, value in shapes(corridor, mask=corridor > 0, transform=transform):
 gpd.GeoDataFrame(features, crs=pawpaw.crs).to_file(OUT_CORRIDOR_SHP)
 
 print("Corridor modeling complete.")
+
