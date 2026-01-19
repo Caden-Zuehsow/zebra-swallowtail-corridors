@@ -7,11 +7,10 @@ from shapely.geometry import Point
 import random
 
 # -----------------------------
-# FILE PATHS (EDIT THESE)
+# FILE PATHS
 # -----------------------------
 CORRIDOR_RASTER = "outputs/corridors.tif"
-BUTTERFLY_CSV = "data/zebra_swallowtail_observations.csv"
-BOUNDARY_FILE = "data/brown_county_boundary.gpkg"
+BUTTERFLY_FILE = "data/zebra_swallowtail_points.shp"
 
 # -----------------------------
 # LOAD CORRIDOR RASTER
@@ -33,18 +32,18 @@ corridor_bin = (corridor >= threshold).astype(np.uint8)
 distance_to_corridor = distance_transform_edt(1 - corridor_bin) * pixel_size
 
 # -----------------------------
-# LOAD BUTTERFLIES
+# LOAD BUTTERFLIES (SYNTHETIC)
 # -----------------------------
-butterflies = gpd.read_file(BUTTERFLY_CSV)
-butterflies = butterflies.set_geometry(
-    gpd.points_from_xy(butterflies.longitude, butterflies.latitude),
-    crs="EPSG:4326"
-).to_crs(crs)
+butterflies = gpd.read_file(BUTTERFLY_FILE).to_crs(crs)
 
-# -----------------------------
-# LOAD BOUNDARY
-# -----------------------------
-boundary = gpd.read_file(BOUNDARY_FILE).to_crs(crs)
+# Check for empty geometries
+empty_count = butterflies.geometry.is_empty.sum()
+if empty_count > 0:
+    print(f"Warning: {empty_count} empty geometries found in butterfly shapefile, skipping them.")
+butterflies = butterflies[~butterflies.geometry.is_empty]
+
+if len(butterflies) == 0:
+    raise ValueError("No valid butterfly points to validate. Check your shapefile!")
 
 # -----------------------------
 # SAMPLE DISTANCE FUNCTION
@@ -52,6 +51,8 @@ boundary = gpd.read_file(BOUNDARY_FILE).to_crs(crs)
 def sample_distances(gdf):
     distances = []
     for pt in gdf.geometry:
+        if pt is None or pt.is_empty:
+            continue  # skip invalid points
         col, row = ~transform * (pt.x, pt.y)
         row, col = int(row), int(col)
         if 0 <= row < distance_to_corridor.shape[0] and 0 <= col < distance_to_corridor.shape[1]:
@@ -66,15 +67,13 @@ obs_distances = sample_distances(butterflies)
 # -----------------------------
 # RANDOM POINTS (NULL MODEL)
 # -----------------------------
-minx, miny, maxx, maxy = boundary.total_bounds
+minx, miny, maxx, maxy = butterflies.total_bounds
 random_points = []
 
 while len(random_points) < len(obs_distances):
     x = random.uniform(minx, maxx)
     y = random.uniform(miny, maxy)
-    p = Point(x, y)
-    if boundary.contains(p).any():
-        random_points.append(p)
+    random_points.append(Point(x, y))
 
 random_gdf = gpd.GeoDataFrame(geometry=random_points, crs=crs)
 rand_distances = sample_distances(random_gdf)
